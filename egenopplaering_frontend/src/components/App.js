@@ -1,4 +1,5 @@
 import React from 'react';
+import axios from 'axios';
 import 'semantic-ui-css/semantic.min.css';
 
 import Title from './Title';
@@ -13,22 +14,7 @@ class App extends React.Component {
       temp: '',
       standardStyle: 'ui clearing segment',
       errorMessageStyle: 'ui negative message hidden',
-      handling: [
-        {
-          name:'Buy groceries',
-          style: 'ui clearing segment',
-          disabled: '',
-          finish_unfinishButtonText: 'Finish',
-          finish_unfinishButtonIcon: 'check icon',
-        },
-        {
-          name:'Run a mile',
-          style: 'ui clearing segment',
-          disabled: '',
-          finish_unfinishButtonText: 'Finish',
-          finish_unfinishButtonIcon: 'check icon',
-        }
-      ],
+      handling: [],
       todoStyle: '',
       finished: false,
       showModal: false,
@@ -36,27 +22,46 @@ class App extends React.Component {
     };
   }
 
+  componentDidMount(){
+    fetch('http://localhost:8080/TODOActions/')
+    .then(res => res.json())
+    .then((data) => {
+      this.setState({handling: data._embedded.tODOActionList});
+    })
+    .catch(res => console.log(res));
+  }
+
   addTodo = (e) => {
     e.preventDefault(); //prevents default
     //joins old objectArray and
+
     if(this.state.temp === '' || this.state.temp === ' '){
       this.setState({errorMessageStyle: 'ui negative message'})
     }else{
-      const joinedState = [
-        ...this.state.handling,
-          {
-            name:this.state.temp,
-            style:this.state.standardStyle,
-            finish_unfinishButtonText: 'Finish',
-            finish_unfinishButtonIcon: 'check icon',
-            disabled:''
-          }
-      ];
-      this.setState({
-        handling: joinedState,
-
-        errorMessageStyle: 'ui negative message hidden',
-      });
+      const newTODO = {
+        name:this.state.temp,
+        style:this.state.standardStyle,
+        finish_unfinishButtonText: 'Finish',
+        finish_unfinishButtonIcon: 'check icon',
+        disabled: ''
+      }
+      axios.post('http://localhost:8080/TODOActions/', newTODO)
+        .then( res => {
+          const joinedState = [
+            ...this.state.handling,
+              {
+                name:this.state.temp,
+                style:this.state.standardStyle,
+                finish_unfinishButtonText: 'Finish',
+                finish_unfinishButtonIcon: 'check icon',
+                disabled:''
+              }
+          ];
+          this.setState({
+            handling:joinedState,
+            errorMessageStyle: 'ui negative message hidden',
+          })
+        })
     }
   };
 
@@ -71,30 +76,40 @@ class App extends React.Component {
   };
 
   deleteTodo = (index) => {
+    const item = this.state.handling[index];
+    axios.delete(`http://localhost:8080/${item.id}`)
+      .then(axios.get('http://localhost:8080/TODOActions/'))
+      .catch(res => console.log(res));
     //gets entire objectArray
     const todoList = [...this.state.handling];
     //splices array at index
     todoList.splice(index,1);
     //sets new state without old object in objectArray
     this.setState({handling:todoList});
+
+
   };
 
-  editTodo = (index, e) => {this.setState(
+  editTodo = (index, e) => {
+    this.setState(
       {
         showModal: !this.state.showModal,
-        editingTodoIndex: index
+        editingTodoIndex: index+1
       });};
 
   changeTodoName= (index, e) => {
     //gets entire handling object array
     const entireTodoState = [...this.state.handling];
     //changes correct object of objectarray from state.editingTodoIndex and assignes the value written
-    entireTodoState[this.state.editingTodoIndex].name = this.state.temp;
+    entireTodoState[this.state.editingTodoIndex-1].name = this.state.temp;
     this.setState({
       handling:entireTodoState,
       showModal: false,
       temp: '',
     });
+    const object = this.state.handling[this.state.editingTodoIndex-1];
+    axios.put(`http://localhost:8080/TODOActions/${this.state.editingTodoIndex}`, object, this.state.editingTodoIndex)
+      .catch(res => console.log(res));
   }
 
   finishTodo = (index, e) => {
@@ -103,11 +118,13 @@ class App extends React.Component {
     //get particular object in array
     const todoObject = this.state.handling[index];
 
+    var actualStyleForTODO = this.state.handling[index].style === 'ui clearing segment' ? 'ui clearing segment disabled' : 'ui clearing segment'
+    todoObject.style = actualStyleForTODO;
+
     var extraStyle = this.state.handling[index].disabled === ' disabled' ? '' : ' disabled'
     //assign disabled to appropriate fields
-    todoObject.style = this.state.standardStyle + extraStyle;
+    ////todoObject.style = this.state.standardStyle + extraStyle;
     todoObject.disabled = extraStyle;
-
     //conditional rendering of text on finish/unfinish button
     var btnTxt = this.state.handling[index].disabled === ' disabled' ? 'Unfinish' : 'Finish';
     //conditional rendering of button on finish/unfinish button
@@ -121,6 +138,8 @@ class App extends React.Component {
     objectArray[index] = todoObject;
     //set state
     this.setState({todoStyle: 'disabled'});
+    axios.put(`http://localhost:8080/TODOActions/${index+1}`, todoObject, index+1)
+      .catch(res => console.log(res));
 
   };
 
